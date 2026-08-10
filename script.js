@@ -8,29 +8,29 @@ const boostBtn = document.getElementById('boostBtn');
 const statusText = document.getElementById('statusText');
 const player = document.getElementById('player');
 
-const volRange = document.getElementById('volRange') || { value: 100, addEventListener: () => {} };
-const volVal = document.getElementById('volVal') || { textContent: '' };
-const speedRange = document.getElementById('speedRange') || { value: 100, addEventListener: () => {} };
-const speedVal = document.getElementById('speedVal') || { textContent: '' };
-const echoRange = document.getElementById('echoRange') || { value: 0, addEventListener: () => {} };
-const echoVal = document.getElementById('echoVal') || { textContent: '' };
-const trebleRange = document.getElementById('trebleRange') || { value: 0, addEventListener: () => {} };
-const trebleVal = document.getElementById('trebleVal') || { textContent: '' };
+const volRange = document.getElementById('volRange');
+const volVal = document.getElementById('volVal');
+const speedRange = document.getElementById('speedRange');
+const speedVal = document.getElementById('speedVal');
+const echoRange = document.getElementById('echoRange');
+const echoVal = document.getElementById('echoVal');
+const trebleRange = document.getElementById('trebleRange');
+const trebleVal = document.getElementById('trebleVal');
 
 let fileArrayBuffer = null;
 
 bRange.addEventListener('input', () => bVal.textContent = bRange.value + '%');
 qRange.addEventListener('input', () => qVal.textContent = qRange.value + '%');
-volRange.addEventListener('input', () => { if(volVal) volVal.textContent = volRange.value + '%'; });
-speedRange.addEventListener('input', () => { if(speedVal) speedVal.textContent = speedRange.value + '%'; });
-echoRange.addEventListener('input', () => { if(echoVal) echoVal.textContent = echoRange.value + '%'; });
-trebleRange.addEventListener('input', () => { if(trebleVal) trebleVal.textContent = trebleRange.value + '%'; });
+volRange.addEventListener('input', () => volVal.textContent = volRange.value + '%');
+speedRange.addEventListener('input', () => speedVal.textContent = speedRange.value + '%');
+echoRange.addEventListener('input', () => echoVal.textContent = echoRange.value + '%');
+trebleRange.addEventListener('input', () => trebleVal.textContent = trebleRange.value + '%');
 
 audioFile.addEventListener('change', () => {
-    const file = audioFile.files[0];
-    if (!file) return;
+    const file = audioFile.files;
+    if (!file || !file[0]) return;
     
-    fileName.textContent = file.name;
+    fileName.textContent = file[0].name;
     statusText.textContent = "Файл выбран. Настройте эффекты и взрывайте!";
     boostBtn.disabled = false;
 
@@ -38,14 +38,11 @@ audioFile.addEventListener('change', () => {
     reader.onload = function(e) {
         fileArrayBuffer = e.target.result;
     };
-    reader.readAsArrayBuffer(file);
+    reader.readAsArrayBuffer(file[0]);
 });
 
 boostBtn.addEventListener('click', async () => {
-    if (!fileArrayBuffer) {
-        statusText.textContent = "Ошибка: Выберите файл заново.";
-        return;
-    }
+    if (!fileArrayBuffer) return;
     
     statusText.textContent = "Взрываем трек по фану...";
     boostBtn.disabled = true;
@@ -57,14 +54,15 @@ boostBtn.addEventListener('click', async () => {
     mainCtx.decodeAudioData(fileArrayBuffer.slice(0), async (originalBuffer) => {
         const bassPower = parseInt(bRange.value);
         const qualityPower = parseInt(qRange.value) / 100;
-        const volumePower = parseInt(volRange.value || 100) / 100;
-        const speedPower = parseInt(speedRange.value || 100) / 100;
-        const echoPower = parseInt(echoRange.value || 0) / 100;
-        const treblePower = parseInt(trebleRange.value || 0);
+        const volumePower = parseInt(volRange.value) / 100;
+        const speedPower = parseInt(speedRange.value) / 100;
+        const echoPower = parseInt(echoRange.value) / 100;
+        const treblePower = parseInt(trebleRange.value);
 
         const originalSr = originalBuffer.sampleRate;
         const newLength = Math.floor(originalBuffer.length / speedPower);
-        const offlineCtx = new OfflineAudioContext(originalBuffer.numberOfChannels, newLength, originalSr);
+        
+        const offlineCtx = new OfflineAudioContext(2, newLength, originalSr);
         
         const source = offlineCtx.createBufferSource();
         source.buffer = originalBuffer;
@@ -169,21 +167,25 @@ boostBtn.addEventListener('click', async () => {
 
 function applyBitcrusher(buffer, quality, depth) {
     if (quality >= 1 && depth >= 16) return buffer;
+    
+    const numChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const bufferLength = buffer.length;
+
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     const ctx = new AudioContextClass();
-    const newBuffer = ctx.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+    const newBuffer = ctx.createBuffer(numChannels, bufferLength, sampleRate);
     ctx.close();
 
     const validQuality = Math.max(0.005, quality); 
-    const step = Math.min(buffer.length, Math.max(1, Math.round(1 / validQuality)));
-    const maxVal = Math.pow(2, depth) - 1;
+    const step = Math.min(bufferLength, Math.max(1, Math.round(1 / validQuality)));
 
-    for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+    for (let channel = 0; channel < numChannels; channel++) {
         const inputData = buffer.getChannelData(channel);
         const outputData = newBuffer.getChannelData(channel);
         let lastVal = 0;
 
-        for (let i = 0; i < buffer.length; i++) {
+        for (let i = 0; i < bufferLength; i++) {
             if (i % step === 0) {
                 let sample = inputData[i];
                 lastVal = isNaN(sample) ? 0 : sample;
@@ -195,14 +197,21 @@ function applyBitcrusher(buffer, quality, depth) {
 }
 
 function bufferToWav(buffer) {
-    const chan = buffer.numberOfChannels, resLen = buffer.length * chan * 2 + 44, arr = new ArrayBuffer(resLen), view = new DataView(arr);
+    const chan = buffer.numberOfChannels;
+    const bufferLength = buffer.length;
+    const resLen = bufferLength * chan * 2 + 44; 
+    const arr = new ArrayBuffer(resLen);
+    const view = new DataView(arr);
     let pos = 0;
+    
     const wStr = s => { for(let i=0;i<s.length;i++) view.setUint8(pos+i, s.charCodeAt(i)); pos+=s.length; };
     const w16 = d => { view.setUint16(pos, d, true); pos+=2; };
     const w32 = d => { view.setUint32(pos, d, true); pos+=4; };
+    
     wStr('RIFF'); w32(resLen-8); wStr('WAVE'); wStr('fmt '); w32(16); w16(1); w16(chan); w32(buffer.sampleRate);
-    w32(buffer.sampleRate*chan*2); w16(chan*2); w16(16); wStr('data'); w32(buffer.length*chan*2);
-    for(let o=0; o<buffer.length; o++) {
+    w32(buffer.sampleRate*chan*2); w16(chan*2); w16(16); wStr('data'); w32(bufferLength*chan*2);
+    
+    for(let o=0; o<bufferLength; o++) {
         for(let c=0; c<chan; c++) {
             let s = buffer.getChannelData(c)[o];
             s = s>1?1:s<-1?-1:s;
