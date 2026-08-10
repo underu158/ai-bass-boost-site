@@ -27,10 +27,10 @@ echoRange.addEventListener('input', () => echoVal.textContent = echoRange.value 
 trebleRange.addEventListener('input', () => trebleVal.textContent = trebleRange.value + '%');
 
 audioFile.addEventListener('change', () => {
-    const file = audioFile.files[0];
-    if (!file) return;
+    const file = audioFile.files;
+    if (!file || !file[0]) return;
     
-    fileName.textContent = file.name;
+    fileName.textContent = file[0].name;
     statusText.textContent = "Файл выбран. Настройте эффекты и взрывайте!";
     boostBtn.disabled = false;
 
@@ -38,7 +38,7 @@ audioFile.addEventListener('change', () => {
     reader.onload = function(e) {
         fileArrayBuffer = e.target.result;
     };
-    reader.readAsArrayBuffer(file);
+    reader.readAsArrayBuffer(file[0]);
 });
 
 boostBtn.addEventListener('click', async () => {
