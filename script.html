@@ -206,7 +206,7 @@ function bufferToWav(buffer) {
     const view = new DataView(arr);
     let pos = 0;
     
-    const wStr = s => { for(let i=0;i<s.length;i++) view.setUint8(pos+i, s.charCodeAt(i)); pos+=s.length; };
+    const wStr = s => { for(let i=0; i<s.length; i++) view.setUint8(pos+i, s.charCodeAt(i)); pos+=s.length; };
     const w16 = d => { view.setUint16(pos, d, true); pos+=2; };
     const w32 = d => { view.setUint32(pos, d, true); pos+=4; };
     
