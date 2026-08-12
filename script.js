@@ -19,6 +19,7 @@ const trebleVal = document.getElementById('trebleVal');
 
 let fileArrayBuffer = null;
 let lastLoadedFileName = "";
+let searchInterval = null; // Переменная для остановки таймера
 
 bRange.addEventListener('input', () => bVal.textContent = bRange.value + '%');
 qRange.addEventListener('input', () => qVal.textContent = qRange.value + '%');
@@ -27,9 +28,16 @@ speedRange.addEventListener('input', () => speedVal.textContent = speedRange.val
 echoRange.addEventListener('input', () => echoVal.textContent = echoRange.value + '%');
 trebleRange.addEventListener('input', () => trebleVal.textContent = trebleRange.value + '%');
 
-// Функция безопасного чтения конкретного файла
-function processSelectedFile(file) {
+function processSelectedFile(filesList) {
+    if (!filesList || filesList.length === 0) return;
+    const file = filesList[0]; // Берем строго первый файл
     if (!file || file.name === lastLoadedFileName) return;
+    
+    // Как только файл пойман — ВЫКЛЮЧАЕМ таймер опроса, чтобы разгрузить систему!
+    if (searchInterval) {
+        clearInterval(searchInterval);
+        searchInterval = null;
+    }
     
     lastLoadedFileName = file.name;
     fileName.textContent = file.name;
@@ -45,17 +53,17 @@ function processSelectedFile(file) {
     reader.readAsArrayBuffer(file);
 }
 
-// 1. Стандартный способ (активное ожидание)
+// 1. Активное ожидание через выбор
 audioFile.addEventListener('change', (event) => {
-    if (event.target && event.target.files && event.target.files.length > 0) {
-        processSelectedFile(event.target.files[0]); // Исправлено: берем строго первый файл
+    if (event.target && event.target.files) {
+        processSelectedFile(event.target.files);
     }
 });
 
-// 2. УМНЫЙ АВТО-ОПРОС (Скрипт проверяет кнопку на наличие файла)
-setInterval(() => {
+// 2. Безопасный авто-опрос
+searchInterval = setInterval(() => {
     if (audioFile && audioFile.files && audioFile.files.length > 0) {
-        processSelectedFile(audioFile.files[0]); // Исправлено: берем строго первый файл
+        processSelectedFile(audioFile.files);
     }
 }, 1000);
 
@@ -179,6 +187,13 @@ boostBtn.addEventListener('click', async () => {
         player.style.display = "block";
         statusText.textContent = "Готово! Слушаем результат.";
         boostBtn.disabled = false;
+
+        // После завершения заново включаем безопасный опрос для следующего файла
+        searchInterval = setInterval(() => {
+            if (audioFile && audioFile.files && audioFile.files.length > 0) {
+                processSelectedFile(audioFile.files);
+            }
+        }, 1000);
 
     }, (err) => {
         statusText.textContent = "Ошибка обработки аудио.";
