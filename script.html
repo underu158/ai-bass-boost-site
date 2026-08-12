@@ -26,13 +26,15 @@ speedRange.addEventListener('input', () => speedVal.textContent = speedRange.val
 echoRange.addEventListener('input', () => echoVal.textContent = echoRange.value + '%');
 trebleRange.addEventListener('input', () => trebleVal.textContent = trebleRange.value + '%');
 
+// Четкая связь с интерфейсом index.html
 audioFile.addEventListener('change', (event) => {
     const target = event.target;
     if (!target || !target.files || target.files.length === 0) return;
     
-    // ФИКС: Берем строго первый файл из списка, чтобы мобилки и ноуты его читали!
+    // ИСПРАВЛЕНИЕ: Берем строго первый файл из массива [0]
     const file = target.files[0]; 
     
+    // Сигнал пошел: меняем текст на экране
     fileName.textContent = file.name;
     statusText.textContent = "Файл выбран. Настройте эффекты и взрывайте!";
     boostBtn.disabled = false;
