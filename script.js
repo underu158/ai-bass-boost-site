@@ -18,6 +18,7 @@ const trebleRange = document.getElementById('trebleRange');
 const trebleVal = document.getElementById('trebleVal');
 
 let fileArrayBuffer = null;
+let lastLoadedFileName = "";
 
 bRange.addEventListener('input', () => bVal.textContent = bRange.value + '%');
 qRange.addEventListener('input', () => qVal.textContent = qRange.value + '%');
@@ -26,14 +27,13 @@ speedRange.addEventListener('input', () => speedVal.textContent = speedRange.val
 echoRange.addEventListener('input', () => echoVal.textContent = echoRange.value + '%');
 trebleRange.addEventListener('input', () => trebleVal.textContent = trebleRange.value + '%');
 
-// Стандартный и самый надежный перехват файла без inline-команд
-audioFile.addEventListener('change', (event) => {
-    if (!event.target || !event.target.files || event.target.files.length === 0) return;
+// Функция безопасного чтения файла
+function processSelectedFile(file) {
+    if (!file || file.name === lastLoadedFileName) return;
     
-    const file = event.target.files[0]; // Четко берем первый файл из списка
-    
+    lastLoadedFileName = file.name;
     fileName.textContent = file.name;
-    statusText.textContent = "Файл выбран. Настройте эффекты и взрывайте!";
+    statusText.textContent = "Файл успешно перехвачен движком! Взрывайте!";
     boostBtn.disabled = false;
 
     const reader = new FileReader();
@@ -43,7 +43,21 @@ audioFile.addEventListener('change', (event) => {
         }
     };
     reader.readAsArrayBuffer(file);
+}
+
+// 1. Стандартный способ (активное ожидание)
+audioFile.addEventListener('change', (event) => {
+    if (event.target && event.target.files && event.target.files.length > 0) {
+        processSelectedFile(event.target.files[0]);
+    }
 });
+
+// 2. УМНЫЙ АВТО-ОПРОС (Каждую секунду скрипт сам проверяет кнопку на наличие файла)
+setInterval(() => {
+    if (audioFile && audioFile.files && audioFile.files.length > 0) {
+        processSelectedFile(audioFile.files[0]);
+    }
+}, 1000);
 
 boostBtn.addEventListener('click', async () => {
     if (!fileArrayBuffer) return;
