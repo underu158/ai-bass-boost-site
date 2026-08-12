@@ -19,7 +19,7 @@ const trebleVal = document.getElementById('trebleVal');
 
 let fileArrayBuffer = null;
 let lastLoadedFileName = "";
-let searchInterval = null; // Переменная для остановки таймера
+let searchInterval = null;
 
 bRange.addEventListener('input', () => bVal.textContent = bRange.value + '%');
 qRange.addEventListener('input', () => qVal.textContent = qRange.value + '%');
@@ -30,10 +30,9 @@ trebleRange.addEventListener('input', () => trebleVal.textContent = trebleRange.
 
 function processSelectedFile(filesList) {
     if (!filesList || filesList.length === 0) return;
-    const file = filesList[0]; // Берем строго первый файл
+    const file = filesList[0];
     if (!file || file.name === lastLoadedFileName) return;
     
-    // Как только файл пойман — ВЫКЛЮЧАЕМ таймер опроса, чтобы разгрузить систему!
     if (searchInterval) {
         clearInterval(searchInterval);
         searchInterval = null;
@@ -53,14 +52,12 @@ function processSelectedFile(filesList) {
     reader.readAsArrayBuffer(file);
 }
 
-// 1. Активное ожидание через выбор
 audioFile.addEventListener('change', (event) => {
     if (event.target && event.target.files) {
         processSelectedFile(event.target.files);
     }
 });
 
-// 2. Безопасный авто-опрос
 searchInterval = setInterval(() => {
     if (audioFile && audioFile.files && audioFile.files.length > 0) {
         processSelectedFile(audioFile.files);
@@ -70,7 +67,7 @@ searchInterval = setInterval(() => {
 boostBtn.addEventListener('click', async () => {
     if (!fileArrayBuffer) return;
     
-    statusText.textContent = "Взрываем трек по фану...";
+    statusText.textContent = "Взрываем длинный трек... Пожалуйста, подождите пару секунд...";
     boostBtn.disabled = true;
 
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -99,6 +96,7 @@ boostBtn.addEventListener('click', async () => {
 
         let lastNode = source;
 
+        // ЭФФЕКТ 1: Мощный Бас
         if (bassPower > 100) {
             const gain = (bassPower - 100) / 12; 
             
@@ -127,6 +125,7 @@ boostBtn.addEventListener('click', async () => {
             lastNode = shaper;
         }
 
+        // ЭФФЕКТ 2: Высокие частоты
         if (treblePower > 0) {
             const trebleFilter = offlineCtx.createBiquadFilter();
             trebleFilter.type = "highshelf";
@@ -137,6 +136,23 @@ boostBtn.addEventListener('click', async () => {
             lastNode = trebleFilter;
         }
 
+        // ЭФФЕКТ 3: Качество звука (Ультра-быстрый встроенный Bitcrusher без зависаний лонгов)
+        if (qualityPower < 1) {
+            const crusherNode = offlineCtx.createWaveShaper();
+            const samples = 44100;
+            const curve = new Float32Array(samples);
+            const bits = Math.round(1 + qualityPower * 7); // от 1 до 8 бит
+            const steps = Math.pow(2, bits);
+            for (let i = 0; i < samples; i++) {
+                let x = (i * 2) / samples - 1;
+                curve[i] = Math.round(x * steps) / steps;
+            }
+            crusherNode.curve = curve;
+            lastNode.connect(crusherNode);
+            lastNode = crusherNode;
+        }
+
+        // ЭФФЕКТ 4: Эхо
         if (echoPower > 0) {
             const delay = offlineCtx.createDelay();
             delay.delayTime.setValueAtTime(0.3, 0);
@@ -158,6 +174,7 @@ boostBtn.addEventListener('click', async () => {
             lastNode = merger;
         }
 
+        // Регулировка общей громкости
         const gainNode = offlineCtx.createGain();
         gainNode.gain.setValueAtTime(volumePower, 0);
         lastNode.connect(gainNode);
@@ -180,15 +197,13 @@ boostBtn.addEventListener('click', async () => {
         const renderedBuffer = await offlineCtx.startRendering();
         mainCtx.close();
 
-        const finalBuffer = applyBitcrusher(renderedBuffer, qualityPower, 16);
-        const wavBlob = bufferToWav(finalBuffer);
+        const wavBlob = bufferToWav(renderedBuffer);
         
         player.src = URL.createObjectURL(wavBlob);
         player.style.display = "block";
         statusText.textContent = "Готово! Слушаем результат.";
         boostBtn.disabled = false;
 
-        // После завершения заново включаем безопасный опрос для следующего файла
         searchInterval = setInterval(() => {
             if (audioFile && audioFile.files && audioFile.files.length > 0) {
                 processSelectedFile(audioFile.files);
@@ -201,37 +216,6 @@ boostBtn.addEventListener('click', async () => {
         mainCtx.close();
     });
 });
-
-function applyBitcrusher(buffer, quality, depth) {
-    if (quality >= 1 && depth >= 16) return buffer;
-    
-    const numChannels = buffer.numberOfChannels;
-    const sampleRate = buffer.sampleRate;
-    const bufferLength = buffer.length;
-
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AudioContextClass();
-    const newBuffer = ctx.createBuffer(numChannels, bufferLength, sampleRate);
-    ctx.close();
-
-    const validQuality = Math.max(0.005, quality); 
-    const step = Math.min(bufferLength, Math.max(1, Math.round(1 / validQuality)));
-
-    for (let channel = 0; channel < numChannels; channel++) {
-        const inputData = buffer.getChannelData(channel);
-        const outputData = newBuffer.getChannelData(channel);
-        let lastVal = 0;
-
-        for (let i = 0; i < bufferLength; i++) {
-            if (i % step === 0) {
-                let sample = inputData[i];
-                lastVal = isNaN(sample) ? 0 : sample;
-            }
-            outputData[i] = lastVal;
-        }
-    }
-    return newBuffer;
-}
 
 function bufferToWav(buffer) {
     const chan = buffer.numberOfChannels;
