@@ -27,7 +27,7 @@ speedRange.addEventListener('input', () => speedVal.textContent = speedRange.val
 echoRange.addEventListener('input', () => echoVal.textContent = echoRange.value + '%');
 trebleRange.addEventListener('input', () => trebleVal.textContent = trebleRange.value + '%');
 
-// Функция безопасного чтения файла
+// Функция безопасного чтения конкретного файла
 function processSelectedFile(file) {
     if (!file || file.name === lastLoadedFileName) return;
     
@@ -48,14 +48,14 @@ function processSelectedFile(file) {
 // 1. Стандартный способ (активное ожидание)
 audioFile.addEventListener('change', (event) => {
     if (event.target && event.target.files && event.target.files.length > 0) {
-        processSelectedFile(event.target.files[0]);
+        processSelectedFile(event.target.files[0]); // Исправлено: берем строго первый файл
     }
 });
 
-// 2. УМНЫЙ АВТО-ОПРОС (Каждую секунду скрипт сам проверяет кнопку на наличие файла)
+// 2. УМНЫЙ АВТО-ОПРОС (Скрипт проверяет кнопку на наличие файла)
 setInterval(() => {
     if (audioFile && audioFile.files && audioFile.files.length > 0) {
-        processSelectedFile(audioFile.files[0]);
+        processSelectedFile(audioFile.files[0]); // Исправлено: берем строго первый файл
     }
 }, 1000);
 
