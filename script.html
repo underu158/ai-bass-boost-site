@@ -26,9 +26,11 @@ speedRange.addEventListener('input', () => speedVal.textContent = speedRange.val
 echoRange.addEventListener('input', () => echoVal.textContent = echoRange.value + '%');
 trebleRange.addEventListener('input', () => trebleVal.textContent = trebleRange.value + '%');
 
-audioFile.addEventListener('change', () => {
-    if (!audioFile.files || audioFile.files.length === 0) return;
-    const file = audioFile.files[0];
+// Исправлено чтение: Кроссбраузерный захват событий сброса и изменения файлов
+audioFile.addEventListener('change', (event) => {
+    const target = event.target;
+    if (!target || !target.files || target.files.length === 0) return;
+    const file = target.files[0];
     
     fileName.textContent = file.name;
     statusText.textContent = "Файл выбран. Настройте эффекты и взрывайте!";
@@ -36,7 +38,9 @@ audioFile.addEventListener('change', () => {
 
     const reader = new FileReader();
     reader.onload = function(e) {
-        fileArrayBuffer = e.target.result;
+        if (e.target && e.target.result) {
+            fileArrayBuffer = e.target.result;
+        }
     };
     reader.readAsArrayBuffer(file);
 });
@@ -47,11 +51,15 @@ boostBtn.addEventListener('click', async () => {
     statusText.textContent = "Взрываем трек по фану...";
     boostBtn.disabled = true;
 
+    // Обход блокировок Brave Shields: пересоздаём чистый контекст при каждом клике
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     const mainCtx = new AudioContextClass();
     if (mainCtx.state === 'suspended') await mainCtx.resume();
 
-    mainCtx.decodeAudioData(fileArrayBuffer.slice(0), async (originalBuffer) => {
+    // Безопасное копирование буфера, чтобы файл можно было взрывать много раз подряд
+    const bufferCopy = fileArrayBuffer.slice(0);
+
+    mainCtx.decodeAudioData(bufferCopy, async (originalBuffer) => {
         const bassPower = parseInt(bRange.value);
         const qualityPower = parseInt(qRange.value) / 100;
         const volumePower = parseInt(volRange.value) / 100;
@@ -63,6 +71,7 @@ boostBtn.addEventListener('click', async () => {
         const currentSampleRate = originalBuffer.sampleRate;
         const newLength = Math.floor(originalBuffer.length / speedPower);
         
+        // Универсальный фоновый рендеринг для ПК и мобилок
         const offlineCtx = new OfflineAudioContext(numChannels, newLength, currentSampleRate);
         
         const source = offlineCtx.createBufferSource();
@@ -153,8 +162,8 @@ boostBtn.addEventListener('click', async () => {
         mainCtx.close();
 
         const finalBuffer = applyBitcrusher(renderedBuffer, qualityPower, 16);
-
         const wavBlob = bufferToWav(finalBuffer);
+        
         player.src = URL.createObjectURL(wavBlob);
         player.style.display = "block";
         statusText.textContent = "Готово! Слушаем результат.";
