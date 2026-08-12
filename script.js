@@ -1,3 +1,29 @@
+// 1. ФУНКЦИЯ СБОРКИ ФАЙЛА НАПРАВЛЕНА НАВЕРХ ДЛЯ СТАБИЛЬНОСТИ
+function bufferToWav(buffer) {
+    const chan = buffer.numberOfChannels;
+    const bufferLength = buffer.length;
+    const resLen = bufferLength * chan * 2 + 44; 
+    const arr = new ArrayBuffer(resLen);
+    const view = new DataView(arr);
+    let pos = 0;
+    
+    const wStr = s => { for(let i=0; i<s.length; i++) view.setUint8(pos+i, s.charCodeAt(i)); pos+=s.length; };
+    const w16 = d => { view.setUint16(pos, d, true); pos+=2; };
+    const w32 = d => { view.setUint32(pos, d, true); pos+=4; };
+    
+    wStr('RIFF'); w32(resLen-8); wStr('WAVE'); wStr('fmt '); w32(16); w16(1); w16(chan); w32(buffer.sampleRate);
+    w32(buffer.sampleRate*chan*2); w16(chan*2); w16(16); wStr('data'); w32(bufferLength*chan*2);
+    
+    for(let o=0; o<bufferLength; o++) {
+        for(let c=0; c<chan; c++) {
+            let s = buffer.getChannelData(c)[o];
+            s = s>1?1:s<-1?-1:s;
+            view.setInt16(pos, s<0?s*0x8000:s*0x7FFF, true); pos+=2;
+        }
+    }
+    return new Blob([arr], {type:'audio/wav'});
+}
+
 const audioFile = document.getElementById('audioFile');
 const fileName = document.getElementById('fileName');
 const bRange = document.getElementById('bRange');
@@ -96,7 +122,7 @@ boostBtn.addEventListener('click', async () => {
 
         let lastNode = source;
 
-        // ЭФФЕКТ 1: Мощный Бас
+        // ЭФФЕКТ 1: Басс
         if (bassPower > 100) {
             const gain = (bassPower - 100) / 12; 
             
@@ -136,12 +162,12 @@ boostBtn.addEventListener('click', async () => {
             lastNode = trebleFilter;
         }
 
-        // ЭФФЕКТ 3: Качество звука (Ультра-быстрый встроенный Bitcrusher без зависаний лонгов)
+        // ЭФФЕКТ 3: Качество звука (Встроенный Bitcrusher)
         if (qualityPower < 1) {
             const crusherNode = offlineCtx.createWaveShaper();
             const samples = 44100;
             const curve = new Float32Array(samples);
-            const bits = Math.round(1 + qualityPower * 7); // от 1 до 8 бит
+            const bits = Math.round(1 + qualityPower * 7); 
             const steps = Math.pow(2, bits);
             for (let i = 0; i < samples; i++) {
                 let x = (i * 2) / samples - 1;
@@ -174,7 +200,7 @@ boostBtn.addEventListener('click', async () => {
             lastNode = merger;
         }
 
-        // Регулировка общей громкости
+        // Громкость
         const gainNode = offlineCtx.createGain();
         gainNode.gain.setValueAtTime(volumePower, 0);
         lastNode.connect(gainNode);
@@ -197,6 +223,7 @@ boostBtn.addEventListener('click', async () => {
         const renderedBuffer = await offlineCtx.startRendering();
         mainCtx.close();
 
+        // Финальная сборка и вывод плеера
         const wavBlob = bufferToWav(renderedBuffer);
         
         player.src = URL.createObjectURL(wavBlob);
@@ -216,28 +243,3 @@ boostBtn.addEventListener('click', async () => {
         mainCtx.close();
     });
 });
-
-function bufferToWav(buffer) {
-    const chan = buffer.numberOfChannels;
-    const bufferLength = buffer.length;
-    const resLen = bufferLength * chan * 2 + 44; 
-    const arr = new ArrayBuffer(resLen);
-    const view = new DataView(arr);
-    let pos = 0;
-    
-    const wStr = s => { for(let i=0; i<s.length; i++) view.setUint8(pos+i, s.charCodeAt(i)); pos+=s.length; };
-    const w16 = d => { view.setUint16(pos, d, true); pos+=2; };
-    const w32 = d => { view.setUint32(pos, d, true); pos+=4; };
-    
-    wStr('RIFF'); w32(resLen-8); wStr('WAVE'); wStr('fmt '); w32(16); w16(1); w16(chan); w32(buffer.sampleRate);
-    w32(buffer.sampleRate*chan*2); w16(chan*2); w16(16); wStr('data'); w32(bufferLength*chan*2);
-    
-    for(let o=0; o<bufferLength; o++) {
-        for(let c=0; c<chan; c++) {
-            let s = buffer.getChannelData(c)[o];
-            s = s>1?1:s<-1?-1:s;
-            view.setInt16(pos, s<0?s*0x8000:s*0x7FFF, true); pos+=2;
-        }
-    }
-    return new Blob([arr], {type:'audio/wav'});
-}
