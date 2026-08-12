@@ -1,3 +1,5 @@
+const audioFile = document.getElementById('audioFile');
+const fileName = document.getElementById('fileName');
 const bRange = document.getElementById('bRange');
 const bVal = document.getElementById('bVal');
 const qRange = document.getElementById('qRange');
@@ -5,7 +7,6 @@ const qVal = document.getElementById('qVal');
 const boostBtn = document.getElementById('boostBtn');
 const statusText = document.getElementById('statusText');
 const player = document.getElementById('player');
-const fileName = document.getElementById('fileName');
 
 const volRange = document.getElementById('volRange');
 const volVal = document.getElementById('volVal');
@@ -25,13 +26,12 @@ speedRange.addEventListener('input', () => speedVal.textContent = speedRange.val
 echoRange.addEventListener('input', () => echoVal.textContent = echoRange.value + '%');
 trebleRange.addEventListener('input', () => trebleVal.textContent = trebleRange.value + '%');
 
-// Прямой перехват сигнала из index.html
-window.handleFile = function(inputElement) {
-    if (!inputElement || !inputElement.files || inputElement.files.length === 0) return;
+// Стандартный и самый надежный перехват файла без inline-команд
+audioFile.addEventListener('change', (event) => {
+    if (!event.target || !event.target.files || event.target.files.length === 0) return;
     
-    const file = inputElement.files[0]; // Берем строго первый файл
+    const file = event.target.files[0]; // Четко берем первый файл из списка
     
-    // Мгновенный визуал: меняем текст на экране
     fileName.textContent = file.name;
     statusText.textContent = "Файл выбран. Настройте эффекты и взрывайте!";
     boostBtn.disabled = false;
@@ -43,7 +43,7 @@ window.handleFile = function(inputElement) {
         }
     };
     reader.readAsArrayBuffer(file);
-};
+});
 
 boostBtn.addEventListener('click', async () => {
     if (!fileArrayBuffer) return;
